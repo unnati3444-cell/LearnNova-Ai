@@ -10,9 +10,16 @@ async function fetchYouTubeMetadata(videoId: string): Promise<{ title: string; d
     const html = await res.text()
 
     // Title
-    const titleMatch = html.match(/"title":"([^"]+)"/)
-    const title = titleMatch ? titleMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/') : `YouTube Video (${videoId})`
+    // Extract proper OpenGraph title
+let title = `YouTube Video (${videoId})`
 
+const ogTitleMatch = html.match(/<meta property="og:title" content="([^"]+)"/)
+if (ogTitleMatch && ogTitleMatch[1]) {
+  title = ogTitleMatch[1]
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
     // Description
     const descMatch = html.match(/"shortDescription":"([\s\S]*?)"(?:,"isCrawlable)/)
     let description = ''

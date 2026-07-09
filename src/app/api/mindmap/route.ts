@@ -3,6 +3,44 @@ import { generateAI, stripFences } from '@/lib/ai'
 
 export const maxDuration = 120
 
+function buildPrompt(context: string, instructions?: string, retry = false) {
+  const customBlock = instructions
+    ? `\nCUSTOM INSTRUCTIONS (follow precisely):\n${instructions}\n`
+    : ''
+
+  const retryBlock = retry
+    ? `\nIMPORTANT: Your previous response was invalid JSON. You MUST return strictly valid JSON with properly closed brackets and quotes.\n`
+    : ''
+
+  return `Analyze the following study material and produce a mind map as JSON.
+
+Rules:
+- ONE root topic capturing the overall subject.
+- 6-10 main branches (level 1) — cover major themes, concepts, definitions, types, laws, and examples. Spread evenly.
+- EVERY branch MUST have  2-4 children (level 2). Zero children is NOT allowed.
+- Children must contain real content from the material: definitions, types, features, facts, formula parts. NOT generic sub-topic names.
+- Node labels: 3-7 words max. 
+- there can be full sentences in case of definition, meaning.
+- Do NOT dump all nodes into one branch. Distribute evenly.
+- Only use content from the sources — do not invent.
+
+${customBlock}
+${retryBlock}
+
+Respond ONLY with valid JSON. No markdown. No explanation.
+
+Format:
+{
+  "root": "Central Topic",
+  "branches": [
+    { "label": "Branch Label", "children": ["Child 1", "Child 2"] }
+  ]
+}
+
+SOURCE MATERIAL:
+${context}`
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { sources, instructions } = await req.json()
@@ -11,50 +49,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No sources provided' }, { status: 400 })
 
     const context = sources
-      .map((s: any, i: number) => `--- SOURCE ${i + 1}: ${s.name} ---\n${s.content || ''}`)
+      .map((s: any, i: number) =>
+        `--- SOURCE ${i + 1}: ${s.name} ---\n${s.content || ''}`
+      )
       .join('\n\n')
-      .slice(0, 80000)
+      .slice(0, 60000) // slightly smaller context
 
-    const customBlock = instructions
-      ? `\nCUSTOM INSTRUCTIONS (follow precisely):\n${instructions}\n`
-      : ''
+    // First attempt
+    const { text } = await generateAI({
+      prompt: buildPrompt(context, instructions, false),
+      maxTokens: 2000, // reduced from 4096
+      jsonMode: true,
+    })
 
-    const prompt = `Analyze the following study material and produce a mind map as JSON.
+    let cleaned = stripFences(text)
 
-Rules:
-- ONE root topic capturing the overall subject.
-- 6-10 main branches (level 1) — cover major themes, concepts, definitions, types, laws, and examples. Spread evenly.
-- EVERY branch MUST have exactly 2-4 children (level 2). Zero children is NOT allowed.
-- Children must contain real content from the material: definitions, types, features, facts, formula parts. NOT generic sub-topic names.
-- Node labels: 3-7 words max. No full sentences.
-- Do NOT dump all nodes into one branch. Distribute evenly.
-- Only use content from the sources — do not invent.
-${customBlock}
-Respond ONLY with valid JSON, no markdown, no backticks:
-{
-  "root": "Central Topic",
-  "branches": [
-    { "label": "Branch Label", "children": ["Child 1", "Child 2", "Child 3"] }
-  ]
-}
-
-SOURCE MATERIAL:
-${context}`
-
-    const { text } = await generateAI({ prompt, maxTokens: 4096, jsonMode: true })
-    const cleaned = stripFences(text)
-
-    let parsed: any
     try {
-      parsed = JSON.parse(cleaned)
+      return NextResponse.json(JSON.parse(cleaned))
     } catch {
-      console.error('Mind map JSON parse failed:', cleaned.slice(0, 300))
-      return NextResponse.json({ error: 'Failed to parse mind map. Please try again.' }, { status: 500 })
-    }
+      console.warn('Mind map JSON invalid. Retrying with stricter prompt...')
 
-    return NextResponse.json(parsed)
+      // Retry once with stricter instruction
+      const retryResult = await generateAI({
+        prompt: buildPrompt(context, instructions, true),
+        maxTokens: 1500,
+        jsonMode: true,
+      })
+
+      cleaned = stripFences(retryResult.text)
+
+      try {
+        return NextResponse.json(JSON.parse(cleaned))
+      } catch {
+        console.error('Mind map JSON parse failed after retry:', cleaned.slice(0, 300))
+        return NextResponse.json(
+          { error: 'Mind map generation failed. Please try again.' },
+          { status: 500 }
+        )
+      }
+    }
   } catch (error: any) {
     console.error('Mind map error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to generate mind map' }, { status: 500 })
+    return NextResponse.json(
+      { error: error.message || 'Failed to generate mind map' },
+      { status: 500 }
+    )
   }
 }

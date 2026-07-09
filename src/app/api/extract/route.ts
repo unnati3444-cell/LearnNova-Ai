@@ -151,7 +151,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unsupported source type.' }, { status: 400 })
     }
 
-    return NextResponse.json({ content, title })
+return NextResponse.json({
+  content,
+  title,
+  generatedFromMetadata: content.startsWith('[Note: This video had no transcript')
+})
   } catch (error: any) {
     console.error('Extraction error:', error)
     return NextResponse.json({

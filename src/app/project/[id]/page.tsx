@@ -97,7 +97,14 @@ const TOOLS = [
   { id: 'quiz',       label: 'Quiz',       icon: '⏱️', bg: '#D8E4EC', text: '#3D6B8C' },
 ]
 
-type Source      = { id: string; type: string; name: string; url: string | null; content: string | null }
+type Source = {
+  id: string;
+  type: string;
+  name: string;
+  url: string | null;
+  content: string | null;
+  generated_from_metadata?: boolean
+}
 type Message     = { role: 'user' | 'ai'; text: string }
 type FlashCard   = { id: string; front: string; back: string }
 type MCQQuestion = { id: string; type: 'mcq' | 'truefalse'; question: string; options: string[]; correct: number; explanation: string }
@@ -407,7 +414,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       const res  = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, url: urlInput.trim() }) })
       const data = await res.json()
       if (data.error) { alert('Error: ' + data.error); setUploading(false); return }
-      await supabase.from('sources').insert({ project_id: id, type, name: data.title || urlInput, url: urlInput, content: data.content })
+await supabase.from('sources').insert({
+  project_id: id,
+  type,
+  name: data.title || urlInput,
+  url: urlInput,
+  content: data.content,
+  generated_from_metadata: data.generatedFromMetadata || false
+})
       setUrlInput(''); setShowAddSource(false); setAddMode('menu'); loadSources()
     } catch (err: any) { alert('Failed: ' + err.message) }
     setUploading(false)
@@ -685,8 +699,36 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 2 }}>
                   <span style={{ fontSize: 13 }}>{srcIcon(src.type)}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: '#3A2E22', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.name}</span>
-                </div>
+<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <span style={{
+    fontSize: 12,
+    fontWeight: 500,
+    color: '#3A2E22',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  }}>
+    {src.name}
+  </span>
+
+  {src.generated_from_metadata && (
+    <span
+      title="This video had no transcript. Content was generated from metadata."
+      style={{
+        fontSize: 9,
+        background: '#FFD6D6',
+        color: '#A8453F',
+        padding: '2px 6px',
+        borderRadius: 6,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase'
+      }}
+    >
+      AI
+    </span>
+  )}
+</div>                </div>
                 <div style={{ fontSize: 11, color: '#A8997E', paddingLeft: 20 }}>{src.type}</div>
               </div>
               {!isDemo && (

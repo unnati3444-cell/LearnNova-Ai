@@ -34,8 +34,7 @@ const data = await oembedRes.json()
 
 if (data.title) {
   title = data.title
-  
-  console.log('[YouTube] oEmbed status:', oembedRes.status)
+
 }
     if (oembedRes.ok) {
       const data = await oembedRes.json()

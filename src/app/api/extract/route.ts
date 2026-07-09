@@ -16,9 +16,27 @@ async function fetchYouTubeMetadata(videoId: string): Promise<{
   // ✅ 1. Get correct title using official oEmbed API
   try {
     const oembedRes = await fetch(
-      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
-    )
+  `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+  {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+      'Accept': 'application/json',
+    },
+  }
+)
 
+if (!oembedRes.ok) {
+  throw new Error('oEmbed failed')
+}
+
+const data = await oembedRes.json()
+
+if (data.title) {
+  title = data.title
+  
+  console.log('[YouTube] oEmbed status:', oembedRes.status)
+}
     if (oembedRes.ok) {
       const data = await oembedRes.json()
       if (data.title) {

@@ -39,11 +39,13 @@ export type AIOptions = {
   maxTokens?: number
   temperature?: number
   jsonMode?: boolean
+  minChars?: number  // if set, result will include underLength flag
 }
 
 export type AIResult = {
   text: string
   provider: string
+  underLength?: boolean  // true if output was shorter than minChars
 }
 
 // ── Strip markdown fences ──────────────────────────────────────────────────────
@@ -189,7 +191,8 @@ function buildLongAttempts(opts: AIOptions): Array<{ label: string; fn: () => Pr
 // ── Shared runner ──────────────────────────────────────────────────────────────
 async function runAttempts(
   attempts: Array<{ label: string; fn: () => Promise<string> }>,
-  tag: string
+  tag: string,
+  minChars?: number
 ): Promise<AIResult> {
   const errors: string[] = []
 
@@ -197,8 +200,12 @@ async function runAttempts(
     try {
       console.log(`[${tag}] Trying ${attempt.label}...`)
       const text = await attempt.fn()
-      console.log(`[${tag}] Success with ${attempt.label}`)
-      return { text, provider: attempt.label }
+      console.log(`[${tag}] Success with ${attempt.label} (${text.length} chars)`)
+      const underLength = minChars !== undefined ? text.length < minChars : undefined
+      if (underLength) {
+        console.warn(`[${tag}] Output too short: got ${text.length} chars, expected >= ${minChars}`)
+      }
+      return { text, provider: attempt.label, underLength: minChars !== undefined ? text.length < minChars : undefined }
     } catch (err: any) {
       const msg = (err?.message || 'Unknown error').slice(0, 120)
       console.warn(`[${tag}] ${attempt.label} failed: ${msg}`)
@@ -212,9 +219,9 @@ async function runAttempts(
 
 // ── Main exported functions ────────────────────────────────────────────────────
 export async function generateAI(opts: AIOptions): Promise<AIResult> {
-  return runAttempts(buildAttempts(opts), 'AI')
+  return runAttempts(buildAttempts(opts), 'AI', opts.minChars)
 }
 
 export async function generateAILong(opts: AIOptions): Promise<AIResult> {
-  return runAttempts(buildLongAttempts(opts), 'AI Long')
+  return runAttempts(buildLongAttempts(opts), 'AI Long', opts.minChars)
 }

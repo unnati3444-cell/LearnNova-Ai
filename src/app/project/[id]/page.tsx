@@ -152,6 +152,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [uploading, setUploading]           = useState(false)
   const [sending, setSending]               = useState(false)
   const [deleteSourceId, setDeleteSourceId] = useState<string | null>(null)
+  const [manualTranscript, setManualTranscript] = useState('')
+  const [manualTitle, setManualTitle] = useState('')
 
   // ── Mobile drawer state ──────────────────────────────────────────────────────
   const [leftOpen, setLeftOpen]   = useState(false)
@@ -1156,16 +1158,17 @@ await supabase.from('sources').insert({
     </div>
   </>
 )}
-            {addMode === 'youtube_manual' && (
+           {addMode === 'youtube_manual' && (
   <>
     <div style={{ fontSize: 12, color: '#7A6B57', marginBottom: 10 }}>
       Paste the transcript of the video below:
     </div>
 
+    {/* Video Title */}
     <input
       placeholder="Video title"
-      value={urlInput}
-      onChange={e => setUrlInput(e.target.value)}
+      value={manualTitle}
+      onChange={e => setManualTitle(e.target.value)}
       style={{
         width: '100%',
         background: '#EDE3D3',
@@ -1179,10 +1182,12 @@ await supabase.from('sources').insert({
       }}
     />
 
+    {/* Transcript textarea */}
     <textarea
       rows={8}
       placeholder="Paste transcript here..."
-      onChange={e => setInput(e.target.value)}
+      value={manualTranscript}
+      onChange={e => setManualTranscript(e.target.value)}
       style={{
         width: '100%',
         background: '#EDE3D3',
@@ -1199,7 +1204,11 @@ await supabase.from('sources').insert({
 
     <div style={{ display: 'flex', gap: 8 }}>
       <button
-        onClick={() => setAddMode('menu')}
+        onClick={() => {
+          setAddMode('menu')
+          setManualTranscript('')
+          setManualTitle('')
+        }}
         style={{ ...btn(), flex: 1, padding: '9px' }}
       >
         Back
@@ -1207,20 +1216,21 @@ await supabase.from('sources').insert({
 
       <button
         onClick={async () => {
-          if (!input.trim() || !urlInput.trim()) return
+          if (!manualTranscript.trim() || !manualTitle.trim()) return
 
           await supabase.from('sources').insert({
             project_id: id,
             type: 'youtube',
-            name: urlInput,
+            name: manualTitle,
             url: null,
-            content: input
+            content: manualTranscript,
+            generated_from_metadata: false
           })
 
           setShowAddSource(false)
           setAddMode('menu')
-          setInput('')
-          setUrlInput('')
+          setManualTranscript('')
+          setManualTitle('')
           loadSources()
         }}
         style={{ ...btn(true), flex: 1, padding: '9px' }}

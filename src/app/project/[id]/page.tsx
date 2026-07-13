@@ -147,7 +147,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [messages, setMessages]             = useState<Message[]>([])
   const [input, setInput]                   = useState('')
   const [showAddSource, setShowAddSource]   = useState(false)
-  const [addMode, setAddMode]               = useState<'menu'|'pdf'|'youtube'|'website'|'doc'>('menu')
+  const [addMode, setAddMode] = useState<'menu' | 'pdf' | 'youtube' | 'website' | 'doc' | 'youtube_manual'>('menu')  
   const [urlInput, setUrlInput]             = useState('')
   const [uploading, setUploading]           = useState(false)
   const [sending, setSending]               = useState(false)
@@ -413,7 +413,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     try {
       const res  = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, url: urlInput.trim() }) })
       const data = await res.json()
-      if (data.error) { alert('Error: ' + data.error); setUploading(false); return }
+if (data.error) {
+  if (type === 'youtube') {
+    const manual = confirm(
+      'This video could not be processed automatically.\n\nWould you like to paste the transcript manually instead?'
+    )
+
+    if (manual) {
+      setAddMode('youtube_manual')
+      setUploading(false)
+      return
+    }
+  }
+
+  alert('Error: ' + data.error)
+  setUploading(false)
+  return
+}
 await supabase.from('sources').insert({
   project_id: id,
   type,
@@ -1092,6 +1108,80 @@ await supabase.from('sources').insert({
                 </div>
               </>
             )}
+            {addMode === 'youtube_manual' && (
+  <>
+    <div style={{ fontSize: 12, color: '#7A6B57', marginBottom: 10 }}>
+      Paste the transcript of the video below:
+    </div>
+
+    <input
+      placeholder="Video title"
+      value={urlInput}
+      onChange={e => setUrlInput(e.target.value)}
+      style={{
+        width: '100%',
+        background: '#EDE3D3',
+        border: '1px solid #DFD2BC',
+        borderRadius: 8,
+        padding: '10px 12px',
+        fontSize: 13,
+        color: '#3A2E22',
+        outline: 'none',
+        marginBottom: 12
+      }}
+    />
+
+    <textarea
+      rows={8}
+      placeholder="Paste transcript here..."
+      onChange={e => setInput(e.target.value)}
+      style={{
+        width: '100%',
+        background: '#EDE3D3',
+        border: '1px solid #DFD2BC',
+        borderRadius: 8,
+        padding: '10px 12px',
+        fontSize: 13,
+        color: '#3A2E22',
+        outline: 'none',
+        resize: 'vertical',
+        marginBottom: 16
+      }}
+    />
+
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button
+        onClick={() => setAddMode('menu')}
+        style={{ ...btn(), flex: 1, padding: '9px' }}
+      >
+        Back
+      </button>
+
+      <button
+        onClick={async () => {
+          if (!input.trim() || !urlInput.trim()) return
+
+          await supabase.from('sources').insert({
+            project_id: id,
+            type: 'youtube',
+            name: urlInput,
+            url: null,
+            content: input
+          })
+
+          setShowAddSource(false)
+          setAddMode('menu')
+          setInput('')
+          setUrlInput('')
+          loadSources()
+        }}
+        style={{ ...btn(true), flex: 1, padding: '9px' }}
+      >
+        Add Transcript
+      </button>
+    </div>
+  </>
+)}
           </div>
         </div>
       )}

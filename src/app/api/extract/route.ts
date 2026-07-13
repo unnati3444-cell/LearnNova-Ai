@@ -144,7 +144,24 @@ export async function POST(req: NextRequest) {
     let title = ''
     let generatedFromMetadata = false
 
+
     // ───────── Website ─────────
+    if (type === 'youtube_manual') {
+  const { content, title } = await req.json()
+
+  if (!content || !title) {
+    return NextResponse.json(
+      { error: 'Transcript and title are required.' },
+      { status: 400 }
+    )
+  }
+
+  return NextResponse.json({
+    content,
+    title,
+    generatedFromMetadata: false,
+  })
+}
     if (type === 'website') {
       const res = await fetch(url)
       const html = await res.text()

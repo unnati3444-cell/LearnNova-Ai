@@ -13,42 +13,43 @@ const MIN_OUTPUT_RATIO = 0.35
 function buildPrompt(content: string, focus?: string, chunkLabel?: string): string {
   const focusBlock = focus ? `\nFOCUS INSTRUCTION: ${focus}\n` : ''
   const chunkBlock = chunkLabel
-    ? `\nNote: This is ${chunkLabel} of the document. Cover EVERY topic, chapter, and section in this part with full detail. Do not skip any chapter even if it appears near the end of this chunk.\n`
+    ? `\nNote: This is ${chunkLabel} of the document.\n`
     : ''
 
-  return `You are creating COMPREHENSIVE, DETAILED study notes for a student — like a thorough set of handwritten class notes that captures everything from the source material.
+  return `You are generating CLASS NOTES for a CA Inter Law student.
 
-FIRST AND MOST IMPORTANT — SKIP ALL OF THE FOLLOWING completely, do not include them in notes:
-- Preface, foreword, introduction pages
-- Disclaimer, copyright notice, ISBN, printing info
-- Editorial board, content writers, academic coordinator names
-- Publisher information, printer details, edition info
-- Table of contents, syllabus listing, course structure pages
-- Acknowledgements, reviewer names
-- Any page that is clearly administrative/publishing metadata
-- "Check Your Progress" question blocks — do NOT include these in the notes
+${focusBlock}
+${chunkBlock}
 
-START notes only from the FIRST actual chapter, unit, or topic of study content.
-${focusBlock}${chunkBlock}
+STRICT RULES:
 
-Use ONLY these emoji markers for structure (each on its own line, no ** around the text after the emoji):
+- Write structured classroom notes.
+- No storytelling.
+- No motivational language.
+- No generic introductions.
+- Convert Hindi explanation into proper English legal notes.
+- Remove filler speech (e.g., "friends", "listen carefully").
+- Use ONLY the transcript content provided.
+- Do NOT add outside knowledge.
+- Keep sentences short and exam-focused.
 
-📚 Main chapter or unit heading
-📌 Subtopic or section heading
-⭐ Important: crucial fact, rule, or must-remember point
-💡 Note: extra context, exception, background, or tip
-📝 Definition: Term → what it means
-🔑 Key Terms: important names, terms, sections (comma separated)
+FORMAT STRUCTURE:
 
-For content between headings: write in FULL explanatory paragraphs. Like a teacher explaining everything to a student. Do NOT use bullet points for main content.
+📚 Main Topic  
+📌 Sub-topic  
+🔑 Section Number (if mentioned)  
+📝 Definition  
+⭐ Important Concept  
+⚖ Case Law (if mentioned)  
+• Bullet Points
 
-CRITICAL RULES FOR DETAIL, LENGTH, AND COMPLETENESS:
-- Every subtopic (📌) must have at least 2-3 full paragraphs of explanation
-- Include EVERY example, every case, every name, every date, every concept
-- Do NOT compress or summarize — capture everything in detail, proportional to how much source content you were given
-- If a chapter/story has multiple internal sections or parts, cover ALL of them
-- Write headings as plain text after the emoji — do NOT wrap them in ** asterisks
-- End your response with the line "===END OF SECTION===" only when you have FULLY covered every chapter in the provided source
+IMPORTANT:
+- Use bullet points.
+- Avoid long paragraphs.
+- No repetition.
+- Only extract actual teaching content.
+- Preserve Section numbers exactly as spoken.
+- Capture examples explained in class.
 
 SOURCE MATERIAL:
 ${content}`

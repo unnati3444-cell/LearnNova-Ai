@@ -189,21 +189,45 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // ✅ Try transcript first
-      try {
-        const { YoutubeTranscript } = await import('youtube-transcript')
-        const transcriptItems =
-          await YoutubeTranscript.fetchTranscript(videoId)
+      // ✅ Try transcript first (improved handling)
+let transcriptSuccess = false
 
-        if (transcriptItems && transcriptItems.length > 0) {
-          content = transcriptItems
-            .map((item: any) => item.text)
-            .join(' ')
+try {
+  const { YoutubeTranscript } = await import('youtube-transcript')
 
-          const meta = await fetchYouTubeMetadata(videoId)
-          title = meta.title
-        }
-      } catch {
+  let transcriptItems: any[] = []
+
+  // 1️⃣ Try Hindi explicitly
+  try {
+    transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'hi' })
+  } catch {}
+
+  // 2️⃣ Fallback to default language
+  if (!transcriptItems || transcriptItems.length === 0) {
+    transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
+  }
+
+  // 3️⃣ Retry once (live videos sometimes fail first time)
+  if (!transcriptItems || transcriptItems.length === 0) {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
+  }
+
+  if (transcriptItems && transcriptItems.length > 0) {
+    content = transcriptItems
+      .map((item: any) => item.text)
+      .join(' ')
+
+    const meta = await fetchYouTubeMetadata(videoId)
+    title = meta.title
+    transcriptSuccess = true
+  }
+} catch (err) {
+  console.log('[YouTube] Transcript fetch failed:', err)
+}
+
+if (!transcriptSuccess) {
+  
         // ✅ Fallback to metadata + AI
         const meta = await fetchYouTubeMetadata(videoId)
         title = meta.title

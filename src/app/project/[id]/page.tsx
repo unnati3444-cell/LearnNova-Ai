@@ -1095,19 +1095,67 @@ await supabase.from('sources').insert({
                 <button onClick={() => setShowAddSource(false)} style={{ ...btn(), width: '100%', display: 'flex', justifyContent: 'center', padding: '9px' }}>Cancel</button>
               </>
             )}
-            {(addMode === 'youtube' || addMode === 'website') && (
-              <>
-                <div style={{ fontSize: 12, color: '#7A6B57', marginBottom: 10 }}>Paste your {addMode === 'youtube' ? 'YouTube video' : 'website'} link below:</div>
-                <input autoFocus placeholder={addMode === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://example.com'} value={urlInput} onChange={e => setUrlInput(e.target.value)}
-                  style={{ width: '100%', background: '#EDE3D3', border: '1px solid #DFD2BC', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: '#3A2E22', outline: 'none', marginBottom: 16 }} />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setAddMode('menu')} style={{ ...btn(), flex: 1, padding: '9px', justifyContent: 'center', display: 'flex' }}>Back</button>
-                  <button onClick={() => handleAddUrl(addMode as 'youtube' | 'website')} disabled={uploading} style={{ ...btn(true), flex: 1, padding: '9px', justifyContent: 'center', display: 'flex', opacity: uploading ? 0.6 : 1 }}>
-                    {uploading ? 'Processing...' : 'Add Source'}
-                  </button>
-                </div>
-              </>
-            )}
+            {addMode === 'youtube' && (
+  <>
+    <div style={{ fontSize: 12, color: '#7A6B57', marginBottom: 10 }}>
+      Paste your YouTube video link below:
+    </div>
+
+    <input
+      autoFocus
+      placeholder="https://youtube.com/watch?v=..."
+      value={urlInput}
+      onChange={e => setUrlInput(e.target.value)}
+      style={{
+        width: '100%',
+        background: '#EDE3D3',
+        border: '1px solid #DFD2BC',
+        borderRadius: 8,
+        padding: '10px 12px',
+        fontSize: 13,
+        color: '#3A2E22',
+        outline: 'none',
+        marginBottom: 12
+      }}
+    />
+
+    {/* ✅ Always visible manual option */}
+    <div
+      onClick={() => setAddMode('youtube_manual')}
+      style={{
+        fontSize: 12,
+        color: '#A8693F',
+        cursor: 'pointer',
+        marginBottom: 16,
+        fontWeight: 600
+      }}
+    >
+      OR paste transcript manually →
+    </div>
+
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button
+        onClick={() => setAddMode('menu')}
+        style={{ ...btn(), flex: 1, padding: '9px' }}
+      >
+        Back
+      </button>
+
+      <button
+        onClick={() => handleAddUrl('youtube')}
+        disabled={uploading}
+        style={{
+          ...btn(true),
+          flex: 1,
+          padding: '9px',
+          opacity: uploading ? 0.6 : 1
+        }}
+      >
+        {uploading ? 'Processing...' : 'Add Source'}
+      </button>
+    </div>
+  </>
+)}
             {addMode === 'youtube_manual' && (
   <>
     <div style={{ fontSize: 12, color: '#7A6B57', marginBottom: 10 }}>

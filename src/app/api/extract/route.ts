@@ -1,78 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateAI } from '@/lib/ai'
 
-// ─────────────────────────────────────────────────────────────
-// YouTube Metadata (Stable Version using oEmbed)
-// ─────────────────────────────────────────────────────────────
-async function fetchYouTubeMetadata(videoId: string): Promise<{
-  title: string
-  description: string
-  keywords: string
-}> {
+/* ─────────────────────────────────────────────
+   Extract YouTube ID (supports all formats)
+───────────────────────────────────────────── */
+function extractYouTubeId(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+
+    if (parsed.searchParams.get('v')) {
+      return parsed.searchParams.get('v')
+    }
+
+    if (parsed.hostname.includes('youtu.be')) {
+      return parsed.pathname.split('/')[1]
+    }
+
+    if (parsed.pathname.includes('/shorts/')) {
+      return parsed.pathname.split('/shorts/')[1].split('/')[0]
+    }
+
+    if (parsed.pathname.includes('/live/')) {
+      return parsed.pathname.split('/live/')[1].split('/')[0]
+    }
+
+    if (parsed.pathname.includes('/embed/')) {
+      return parsed.pathname.split('/embed/')[1].split('/')[0]
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Fetch YouTube Metadata (Reliable)
+───────────────────────────────────────────── */
+async function fetchYouTubeMetadata(videoId: string) {
   let title = `YouTube Video (${videoId})`
   let description = ''
   let keywords = ''
 
-  // ✅ 1. Get correct title using official oEmbed API
+  // ✅ Get title via official oEmbed
   try {
     const oembedRes = await fetch(
-  `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
-  {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
-      'Accept': 'application/json',
-    },
-  }
-)
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+          Accept: 'application/json',
+        },
+      }
+    )
 
-if (!oembedRes.ok) {
-  throw new Error('oEmbed failed')
-}
-
-const data = await oembedRes.json()
-
-if (data.title) {
-  title = data.title
-
-}
     if (oembedRes.ok) {
       const data = await oembedRes.json()
-      if (data.title) {
-        title = data.title
-      }
+      if (data.title) title = data.title
     }
   } catch {
-    console.warn('[YouTube] oEmbed title fetch failed')
+    console.warn('[YouTube] oEmbed failed')
   }
 
-  // ✅ 2. Get description + keywords via page scrape
+  // ✅ Get description + keywords
   try {
-    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    })
+    const res = await fetch(
+      `https://www.youtube.com/watch?v=${videoId}`,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        },
+      }
+    )
 
     const html = await res.text()
 
-    // ✅ og:description (more reliable than JSON parsing)
-    const ogDescMatch = html.match(
+    const descMatch = html.match(
       /<meta property="og:description" content="([^"]*)"/
     )
-    if (ogDescMatch && ogDescMatch[1]) {
-      description = ogDescMatch[1]
+    if (descMatch) {
+      description = descMatch[1]
         .replace(/&amp;/g, '&')
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
         .slice(0, 3000)
     }
 
-    // ✅ keywords
     const keywordsMatch = html.match(
       /<meta name="keywords" content="([^"]+)"/
     )
@@ -80,21 +95,21 @@ if (data.title) {
       keywords = keywordsMatch[1]
     }
   } catch {
-    console.warn('[YouTube] Metadata scrape failed')
+    console.warn('[YouTube] metadata scrape failed')
   }
 
   return { title, description, keywords }
 }
 
-// ─────────────────────────────────────────────────────────────
-// AI Fallback Generator
-// ─────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   AI Fallback Content Generator
+───────────────────────────────────────────── */
 async function generateContentFromMetadata(
   title: string,
   description: string,
   keywords: string,
   videoId: string
-): Promise<string> {
+) {
   const prompt = `A student added a YouTube video as a study source. The video has no transcript available.
 
 VIDEO TITLE: ${title}
@@ -109,25 +124,18 @@ Generate structured study notes covering:
 4. Definitions (if applicable)
 5. Context and background
 
-Only use information that can be reasonably inferred from the metadata.
+Only use information reasonably inferred from the metadata.
 Do NOT fabricate unrelated facts.
 
 Generate at least 300 words.`
 
-  try {
-    const { text } = await generateAI({
-      prompt,
-      maxTokens: 4096,
-    })
-    return text
-  } catch {
-    return `Video: ${title}\n\nDescription: ${description}\n\nKeywords: ${keywords}`
-  }
+  const { text } = await generateAI({ prompt, maxTokens: 4096 })
+  return text
 }
 
-// ─────────────────────────────────────────────────────────────
-// Main API Route
-// ─────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Main API Route
+───────────────────────────────────────────── */
 export async function POST(req: NextRequest) {
   try {
     const { type, url } = await req.json()
@@ -136,15 +144,9 @@ export async function POST(req: NextRequest) {
     let title = ''
     let generatedFromMetadata = false
 
-    // ───────────────── WEBSITE ─────────────────
+    // ───────── Website ─────────
     if (type === 'website') {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      })
-
+      const res = await fetch(url)
       const html = await res.text()
 
       const titleMatch = html.match(/<title>(.*?)<\/title>/i)
@@ -159,16 +161,13 @@ export async function POST(req: NextRequest) {
         .slice(0, 15000)
     }
 
-    // ───────────────── YOUTUBE ─────────────────
+    // ───────── YouTube ─────────
     else if (type === 'youtube') {
-      const videoIdMatch = url.match(
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/
-      )
-      const videoId = videoIdMatch ? videoIdMatch[1] : null
+      const videoId = extractYouTubeId(url)
 
       if (!videoId) {
         return NextResponse.json(
-          { error: 'Invalid YouTube URL.' },
+          { error: 'Invalid YouTube URL format.' },
           { status: 400 }
         )
       }
@@ -188,7 +187,7 @@ export async function POST(req: NextRequest) {
           title = meta.title
         }
       } catch {
-        // ✅ No transcript — fallback
+        // ✅ Fallback to metadata + AI
         const meta = await fetchYouTubeMetadata(videoId)
         title = meta.title
 
@@ -234,7 +233,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          error.message || 'Failed to extract content. Please try again.',
+          error.message || 'Failed to extract content.',
       },
       { status: 500 }
     )

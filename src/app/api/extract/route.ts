@@ -189,45 +189,41 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // ✅ Try transcript first (improved handling)
+      // ✅ Fetch transcript using official timedtext endpoint
 let transcriptSuccess = false
 
 try {
-  const { YoutubeTranscript } = await import('youtube-transcript')
+  // Try Hindi captions first
+  const captionUrlHi = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=hi&fmt=json3`
+  let res = await fetch(captionUrlHi)
 
-  let transcriptItems: any[] = []
-
-  // 1️⃣ Try Hindi explicitly
-  try {
-    transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'hi' })
-  } catch {}
-
-  // 2️⃣ Fallback to default language
-  if (!transcriptItems || transcriptItems.length === 0) {
-    transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
+  // Fallback to auto-generated Hindi captions
+  if (!res.ok) {
+    const captionUrlAuto = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=hi&kind=asr&fmt=json3`
+    res = await fetch(captionUrlAuto)
   }
 
-  // 3️⃣ Retry once (live videos sometimes fail first time)
-  if (!transcriptItems || transcriptItems.length === 0) {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
-  }
+  if (res.ok) {
+    const data = await res.json()
 
-  if (transcriptItems && transcriptItems.length > 0) {
-    content = transcriptItems
-      .map((item: any) => item.text)
-      .join(' ')
+    if (data.events) {
+      content = data.events
+        .filter((e: any) => e.segs)
+        .map((e: any) =>
+          e.segs.map((s: any) => s.utf8).join('')
+        )
+        .join(' ')
 
-    const meta = await fetchYouTubeMetadata(videoId)
-    title = meta.title
-    transcriptSuccess = true
+      const meta = await fetchYouTubeMetadata(videoId)
+      title = meta.title
+      transcriptSuccess = true
+    }
   }
 } catch (err) {
-  console.log('[YouTube] Transcript fetch failed:', err)
+  console.log('[YouTube] Direct caption fetch failed:', err)
 }
 
 if (!transcriptSuccess) {
-  
         // ✅ Fallback to metadata + AI
         const meta = await fetchYouTubeMetadata(videoId)
         title = meta.title

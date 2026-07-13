@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateAI, generateAILong } from '@/lib/ai'
 
+function cleanTranscript(text: string): string {
+  if (!text) return ''
+
+  return text
+    // Remove timestamps like 00:01, 1:23, 01:02:03
+    .replace(/\b\d{1,2}:\d{2}(:\d{2})?\b/g, '')
+
+    // Remove bracket tags like [Music], [Applause]
+    .replace(/\[[^\]]+\]/g, '')
+
+    // Remove common filler phrases (Hindi + English)
+    .replace(/हां जी दोस्तों.*?(?=\.)/gi, '')
+    .replace(/दोस्तों.*?(?=\.)/gi, '')
+    .replace(/सुनो मेरी बात.*?(?=\.)/gi, '')
+    .replace(/please listen.*?(?=\.)/gi, '')
+    .replace(/guys.*?(?=\.)/gi, '')
+
+    // Remove excessive whitespace
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export const maxDuration = 120
 
 const CHUNK_SIZE = 100000
@@ -23,6 +45,7 @@ ${chunkBlock}
 
 STRICT RULES:
 
+- Translate Hindi explanations into formal legal English.
 - Write structured classroom notes.
 - No storytelling.
 - No motivational language.
@@ -130,9 +153,14 @@ export async function POST(req: NextRequest) {
     if (!sources || sources.length === 0)
       return NextResponse.json({ error: 'No sources provided' }, { status: 400 })
 
-    const fullContent = sources
-      .map((s: any, i: number) => `--- SOURCE ${i + 1}: ${s.name} ---\n${s.content || ''}`)
-      .join('\n\n')
+    const rawContent = sources
+  .map((s: any, i: number) =>
+    `--- SOURCE ${i + 1}: ${s.name} ---\n${s.content || ''}`
+  )
+  .join('\n\n')
+  .slice(0, 120000)
+
+const fullContent = cleanTranscript(rawContent)
 
     let finalNotes = ''
 

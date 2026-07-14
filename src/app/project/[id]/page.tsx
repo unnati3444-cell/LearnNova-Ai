@@ -544,7 +544,7 @@ await supabase.from('sources').insert({
     // ✅ Auto-timeout after 3 minutes (prevents hanging forever)
     const timeout = setTimeout(() => controller.abort(), 180000)
 
-    const res = await fetch('/api/notes', {
+    const res = await fetch('https://learnnova-backend-production.up.railway.app/generate-notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

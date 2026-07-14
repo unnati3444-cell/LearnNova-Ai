@@ -23,8 +23,8 @@ function cleanTranscript(text: string): string {
     .trim()
 }
 
-export const maxDuration = 120
-
+export const maxDuration = 60
+export const runtime = 'nodejs'
 const CHUNK_SIZE = 100000
 
 // A chunk's notes should be at least this fraction of the chunk's char length.

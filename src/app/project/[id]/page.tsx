@@ -526,20 +526,78 @@ await supabase.from('sources').insert({
   }
 
   async function generateNotes() {
-    const sel = sources.filter(s => selectedIds.has(s.id))
-    if (sel.length === 0) { setNotesError('Please select at least one source first.'); return }
-    if (notesLoading) return
-    setNotesLoading(true); setNotesError('')
-    try {
-      const res  = await fetch('/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: sel.map(s => ({ name: s.name, content: s.content })), focus: notesFocus.trim() || undefined }) })
-      const data = await res.json()
-      if (data.error) { setNotesError(friendlyError(data.error, 'notes')) } else {
-        setNotesContent(data.notes); setNotesSourceIds(new Set(sel.map(s => s.id)))
-        if (!isDemo) await supabase.from('notes').upsert({ project_id: id, content: data.notes, source_ids: sel.map(s => s.id) }, { onConflict: 'project_id' })
-      }
-    } catch { setNotesError(friendlyError('network', 'notes')) }
+  const sel = sources.filter(s => selectedIds.has(s.id))
+
+  if (sel.length === 0) {
+    setNotesError('Please select at least one source first.')
+    return
+  }
+
+  if (notesLoading) return
+
+  setNotesLoading(true)
+  setNotesError('')
+
+  try {
+    const controller = new AbortController()
+
+    // ✅ Auto-timeout after 3 minutes (prevents hanging forever)
+    const timeout = setTimeout(() => controller.abort(), 180000)
+
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sources: sel.map(s => ({
+          name: s.name,
+          content: s.content
+        })),
+        focus: notesFocus.trim() || undefined
+      }),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeout)
+
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(text || `Server error (${res.status})`)
+    }
+
+    const data = await res.json()
+
+    if (data.error) {
+      throw new Error(data.error)
+    }
+
+    // ✅ Success
+    setNotesContent(data.notes)
+    setNotesSourceIds(new Set(sel.map(s => s.id)))
+
+    if (!isDemo) {
+      await supabase.from('notes').upsert(
+        {
+          project_id: id,
+          content: data.notes,
+          source_ids: sel.map(s => s.id)
+        },
+        { onConflict: 'project_id' }
+      )
+    }
+
+  } catch (err: any) {
+
+    if (err.name === 'AbortError') {
+      setNotesError('The request took too long and was stopped. Try smaller content.')
+    } else {
+      console.error('Notes generation error:', err)
+      setNotesError(friendlyError(err.message || 'network', 'notes'))
+    }
+
+  } finally {
     setNotesLoading(false)
   }
+}
 
   async function generateFlashcards() {
     const sel = sources.filter(s => selectedIds.has(s.id))
